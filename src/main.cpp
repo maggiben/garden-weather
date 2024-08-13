@@ -52,11 +52,15 @@ void setup() {
     vTaskDelay(100 / portTICK_PERIOD_MS); // wait for serial port to connect. Needed for native USB
   }
 
+  Serial.println("Setup Init\n");
+
   Wire.begin();
   i2cMutex = xSemaphoreCreateMutex();
   if (i2cMutex == NULL) {
     TRACE("Error insufficient heap memory to create i2cMutex mutex\n");
   }
+
+  printI2cDevices();
 
   // Check if EEPROM is ready
   Wire.beginTransmission(EEPROM_ADDRESS);
@@ -93,10 +97,10 @@ void setup() {
     // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
 
-  if (!bmp.begin()) {
-    Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
-                      "try a different address!"));
-    while (1) delay(10);
+  if (!bmp.begin(0x76)) {
+    TRACE("Could not find a valid BMP280 sensor, check wiring or try a different address!\n");
+    Serial.flush();
+    abort();
   }
 
   /* Default settings from datasheet. */
@@ -110,68 +114,68 @@ void setup() {
 
   // Create a queue capable of holding 10 strings of up to 100 characters each
     // Serial commander task
-#if defined(ENABLE_SERIAL_COMMANDS)
-  xTaskCreatePinnedToCore(
-    serialPortHandler,     // Task function
-    "SerialPort",          // Name of the task (for debugging)
-    89000,                 // Stack size (in words, not bytes)
-    NULL,                  // Task input parameter
-    PRIORITY_HIGH,         // Priority of the task
-    &serialTaskHandle,     // Task handle
-    1                      // Core where the task should run
-  );
-#endif
+// #if defined(ENABLE_SERIAL_COMMANDS)
+//   xTaskCreatePinnedToCore(
+//     serialPortHandler,     // Task function
+//     "SerialPort",          // Name of the task (for debugging)
+//     89000,                 // Stack size (in words, not bytes)
+//     NULL,                  // Task input parameter
+//     PRIORITY_HIGH,         // Priority of the task
+//     &serialTaskHandle,     // Task handle
+//     1                      // Core where the task should run
+//   );
+// #endif
 
-#if defined(WIFI_ENABLED)
-  String ssid = config["network"]["ssid"].isNull() ? WIFI_SSID : config["network"]["ssid"].as<String>();
-  String password = config["network"]["password"].isNull() ? WIFI_PASSWORD : config["network"]["password"].as<String>();
-  bool enabled = config["network"]["enabled"].isNull() ? WIFI_ENABLED : config["network"]["enabled"].as<bool>();
-  TRACE("ssid: %s\n", ssid.c_str());
-  TRACE("password: %s\n", password.c_str());
-  TRACE("config: %s\n", config.as<String>().c_str());
-  if (enabled && connectToWiFi(ssid.c_str(), password.c_str())) {
-    IPAddress ip = WiFi.localIP();
-    TRACE("\n");
-    TRACE("Wifi Connected: IP: %s - Hostname: %s\n", WiFi.localIP().toString().c_str(), WiFi.getHostname());
+// #if defined(WIFI_ENABLED)
+//   String ssid = config["network"]["ssid"].isNull() ? WIFI_SSID : config["network"]["ssid"].as<String>();
+//   String password = config["network"]["password"].isNull() ? WIFI_PASSWORD : config["network"]["password"].as<String>();
+//   bool enabled = config["network"]["enabled"].isNull() ? WIFI_ENABLED : config["network"]["enabled"].as<bool>();
+//   TRACE("ssid: %s\n", ssid.c_str());
+//   TRACE("password: %s\n", password.c_str());
+//   TRACE("config: %s\n", config.as<String>().c_str());
+//   if (enabled && connectToWiFi(ssid.c_str(), password.c_str())) {
+//     IPAddress ip = WiFi.localIP();
+//     TRACE("\n");
+//     TRACE("Wifi Connected: IP: %s - Hostname: %s\n", WiFi.localIP().toString().c_str(), WiFi.getHostname());
 
-    // Ask for the current time using NTP request builtin into ESP firmware.
-    TRACE("Setup ntp...\n");
-    initTime(TIMEZONE);
-    printLocalTime();
+//     // Ask for the current time using NTP request builtin into ESP firmware.
+//     TRACE("Setup ntp...\n");
+//     initTime(TIMEZONE);
+//     printLocalTime();
 
-    // Create a task for handling OTA
-#if defined(ENABLE_OTA)
-    xTaskCreatePinnedToCore(
-      handleOTATask,          // Function to implement the task
-      "OtaTask",              // Name of the task
-      46000,                  // Stack size in words
-      NULL,                   // Task input parameter
-      PRIORITY_LOW,           // Priority of the task
-      &otaTaskHandle,         // Task handle
-      1                       // Core where the task should run
-    );
-#endif
-    // Create a task for handling Web Server
-#if defined(ENABLE_HTTP)
-    xTaskCreatePinnedToCore(
-      handleWebServerTask,    // Function to implement the task
-      "WebServerTask",        // Name of the task
-      46000,                  // Stack size in words
-      NULL,                   // Task input parameter
-      PRIORITY_MEDIUM,        // Priority of the task
-      &webServerTaskHandle,   // Task handle
-      1                       // Core where the task should run
-    );
-#endif
+//     // Create a task for handling OTA
+// #if defined(ENABLE_OTA)
+//     xTaskCreatePinnedToCore(
+//       handleOTATask,          // Function to implement the task
+//       "OtaTask",              // Name of the task
+//       46000,                  // Stack size in words
+//       NULL,                   // Task input parameter
+//       PRIORITY_LOW,           // Priority of the task
+//       &otaTaskHandle,         // Task handle
+//       1                       // Core where the task should run
+//     );
+// #endif
+//     // Create a task for handling Web Server
+// #if defined(ENABLE_HTTP)
+//     xTaskCreatePinnedToCore(
+//       handleWebServerTask,    // Function to implement the task
+//       "WebServerTask",        // Name of the task
+//       46000,                  // Stack size in words
+//       NULL,                   // Task input parameter
+//       PRIORITY_MEDIUM,        // Priority of the task
+//       &webServerTaskHandle,   // Task handle
+//       1                       // Core where the task should run
+//     );
+// #endif
 
-  } else if (config["network"]["enabled"].as<bool>()) {
-    TRACE("Wifi not connected!\n");  
-    beep(2);
-    handleWifiConnectionError("WiFi connection error", settings);
-  } else {
-    TRACE("Wifi disabled!\n");
-  }
-#endif
+//   } else if (config["network"]["enabled"].as<bool>()) {
+//     TRACE("Wifi not connected!\n");  
+//     beep(2);
+//     handleWifiConnectionError("WiFi connection error", settings);
+//   } else {
+//     TRACE("Wifi disabled!\n");
+//   }
+// #endif
 
   // Good To Go!
   vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -312,10 +316,13 @@ void serialPortHandler(void *pvParameters) {
 
 
 void loop() {
-  TRACE("Hello World\n");
   if (bmp.takeForcedMeasurement()) {
     // can now print out the new measurements
-    TRACE("Pressure: %d Temperature: %d\n", bmp.readPressure(), bmp.readTemperature());
+    DateTime now = rtc.now();
+    // Read pressure in hPa and temperature in Celsius
+    float pressure_hPa = bmp.readPressure() / 100.0F;
+    float temperature = bmp.readTemperature();
+    TRACE("%04d/%02d/%02d %02d:%02d:%02d -> Pressure: %.2f Temperature: %.2f\n", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), pressure_hPa, temperature);
   } else {
     TRACE("Forced measurement failed!\n");
   }

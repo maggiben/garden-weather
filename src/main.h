@@ -174,6 +174,7 @@ void serialLog(String message);
 /**
  * IO
  */
+void printI2cDevices(byte* devices = NULL);
 
 /**
  * Threads
