@@ -4,7 +4,7 @@
 ENV_NAME="nodemcu-32s"
 RASPBERRY_PI_USER="bmaggi"
 RASPBERRY_PI_IP="zero.local"
-REMOTE_PATH="/garden-weather/firmware/.pio/build/$ENV_NAME"
+REMOTE_PATH="/garden-weather/.pio/build/$ENV_NAME"
 REMOTE_PORT="/dev/ttyUSB0"
 
 # Compile the binary
