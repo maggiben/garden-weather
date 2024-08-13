@@ -157,6 +157,7 @@ void serialPortHandler(void *pvParameters) {
     } else {
       timer += 1;
     }
+    Serial.flush();
     vTaskDelay(10 / portTICK_PERIOD_MS);  // Small delay to yield task
   }
 }
@@ -222,5 +223,5 @@ void handleGetSensor(const String& command) {
   percentage3 = constrain(percentage3, 0.0, 100.0);
 
   // %Y-%m-%dT%H:%M:%S
-  TRACE("%04d-%02d-%02dT%02d:%02d:%02d -> humidity: %.2f temperature: %.2f ADC0: %.2f%% ADC1: %.2f%% ADC2: %.2f%% ADC3: %.2f%%\n", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), humidity.relative_humidity, temperature.temperature, percentage0, percentage1, percentage2, percentage3);
+  TRACE("%04d-%02d-%02dT%02d:%02d:%02d -> humidity: %.2f temperature: %.2f soil_moisture_0: %.2f%% soil_moisture_1: %.2f%% soil_moisture_2: %.2f%% soil_moisture_3: %.2f%%\n", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), humidity.relative_humidity, temperature.temperature, percentage0, percentage1, percentage2, percentage3);
 }

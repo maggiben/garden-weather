@@ -40,8 +40,8 @@ def send_ping_and_get_response():
             try:
                 # Open the serial port
                 ser = serial.Serial(serial_port, 115200, timeout=1)
-                ser.setDTR(False)
-                ser.setRTS(False)
+                # ser.setDTR(False)
+                # ser.setRTS(False)
                 time.sleep(2)  # Wait for the serial connection to initialize
 
                 ser.write(f"{command}\n".encode())
