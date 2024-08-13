@@ -36,72 +36,26 @@
 #pragma once
 #include <Arduino.h>
 #include "freertos/FreeRTOS.h"
-#include <WiFi.h>
-#include <ESPmDNS.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <FS.h>
-#include <SD.h>
 #include <EEPROM.h>
-#include <time.h>
-#include <RTClib.h> // Date and time functions using a DS3231 RTC connected via I2C and Wire lib
-#include <Adafruit_BMP280.h> // Pressure Sensor
-#include <ArduinoOTA.h>
-#include <WebServer.h>
-#include <ArduinoJson.h>
-#include "soc/soc.h"            // For WRITE_PERI_REG
-#include "soc/rtc_cntl_reg.h"   // For RTC_CNTL_BROWN_OUT_REG
+#include <RTClib.h>                 // Date and time functions using a DS3231 RTC connected via I2C and Wire lib
+#include <Adafruit_Sensor.h>
+#include <Adafruit_AHTX0.h>         // humidity sensor
+#include <Adafruit_ADS1X15.h>       // ADC
+#include "soc/soc.h"                // For WRITE_PERI_REG
+#include "soc/rtc_cntl_reg.h"       // For RTC_CNTL_BROWN_OUT_REG
 #include "constants.h"
-// #include "settings.h"
-
-// // Settings
-// Settings settings = {
-//   // Assuming HOSTNAME is defined
-//   HOSTNAME,
-//   // Assuming id is 0
-//   0,
-//   // Assuming lastDateTimeSync is 0
-//   0,
-//   // Assuming updatedOn is 0
-//   0,
-//   // Assuming reboot on wifi failed is false
-//   SETTINGS_REBOOT_ON_WIFIFAIL,
-//   // Flow calibration value
-//   0, // FLOW_CALIBRATION_FACTOR
-//   // Initializing alarms all to 0 (disabled)
-//   {{{0}}},
-//   // Max Plants
-//   SETTINGS_MAX_PLANTS,
-//   // Plant settings
-//   {{0}},
-//   // TaskLog
-//   {0},
-//   // Attemp to use Graphical Display
-//   USE_DISPLAY,
-//   USE_RTC,
-//   USE_EEPROM,
-//   USE_MCP
-// };
 
 // i2c Clock
 RTC_DS3231 rtc; // Address 0x68
 
-// i2c Pressure and Temperature sensor
-Adafruit_BMP280 bmp; // I2C
+// i2c Humidity Sensor
+Adafruit_AHTX0 aht;
 
-// Need a WebServer for http access on port 80.
-WebServer server(80);
+Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
 
-// Need a WebServer for http access on port 80.
-#ifndef server
-  #define SERVER_RESPONSE_OK(...)  server.send(200, "application/jsont; charset=utf-8", __VA_ARGS__)
-  #define SERVER_RESPONSE_SUCCESS()  SERVER_RESPONSE_OK("{\"success\":true}")
-  // #define SERVER_RESPONSE_ERROR(code, ...)  server.send(code, "application/jsont; charset=utf-8", __VA_ARGS__)
-  #define SERVER_RESPONSE_ERROR(code, error)  server.send(code, "application/json; charset=utf-8", String("{\"error\":\"") + error + "\"}")
-#endif
 
-TaskHandle_t webServerTaskHandle;
-TaskHandle_t otaTaskHandle;
 TaskHandle_t serialTaskHandle;
 // Use only core
 #if CONFIG_FREERTOS_UNICORE
@@ -116,60 +70,11 @@ TaskHandle_t serialTaskHandle;
 #define PRIORITY_HIGH      (tskIDLE_PRIORITY + 3)
 #define PRIORITY_VERY_HIGH (tskIDLE_PRIORITY + 4)
 
-// #ifndef WIFI_ENABLED
-//   #define WIFI_ENABLED
-// #endif
-
-// #ifndef ENABLE_OTA
-//   #define ENABLE_OTA
-// #endif
-
-// #ifndef ENABLE_HTTP
-//   #define ENABLE_HTTP
-// #endif
-
-// #ifndef ENABLE_LOGGING
-//   #define ENABLE_LOGGING
-// #endif
-
-// #ifndef ENABLE_SERIAL_COMMANDS
-//   #define ENABLE_SERIAL_COMMANDS
-// #endif
+#ifndef ENABLE_SERIAL_COMMANDS
+  #define ENABLE_SERIAL_COMMANDS
+#endif
 
 SemaphoreHandle_t i2cMutex;
-
-/**
- * Hardware Setup
- */
-
-/**
- * Wireless functions
- */
-bool connectToWiFi(const char* ssid, const char* password, int max_tries = 20, int pause = 500);
-// void handleWifiConnectionError(String error, Settings settings, bool restart = false);
-
-/**
- * Time & RTC Functions
- */
-void syncRTC();
-void setTimezone(String timezone);
-void initTime(String timezone);
-long int getRtcOffset();
-
-/**
- * API Handlers
- */
-void handleSystemInfo();
-void handleLogs();
-void handleRoot();
-void handleNotFound();
-
-/**
- * LCD Display & Serial debug functions
- */
-void printLocalTime();
-void printRtcTime();
-void serialLog(String message);
 
 /**
  * IO
@@ -181,3 +86,25 @@ void printI2cDevices(byte* devices = NULL);
  */
 void handleOTATask(void * parameter);
 void handleWebServerTask(void * parameter);
+
+
+// Define a struct to hold command and function pointer
+struct CommandHandler {
+    String command;
+    void (*handler)(const String&);
+};
+
+/**
+ * Serial Command
+ */
+void serialPortHandler(void *pvParameters);
+void handleUnknown();
+void handleGetSensor(const String& command);
+
+// Array of command handlers
+CommandHandler commandHandlers[] = {
+    {"get-sensor", handleGetSensor},
+    // Add other commands and handlers here
+};
+
+void handleSerialCommand(const String& command);
