@@ -225,3 +225,20 @@ void handleGetSensor(const String& command) {
   // %Y-%m-%dT%H:%M:%S
   TRACE("%04d-%02d-%02dT%02d:%02d:%02d -> humidity: %.2f temperature: %.2f soil_moisture_0: %.2f%% soil_moisture_1: %.2f%% soil_moisture_2: %.2f%% soil_moisture_3: %.2f%%\n", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), humidity.relative_humidity, temperature.temperature, percentage0, percentage1, percentage2, percentage3);
 }
+
+void handleRawSensor(const String& command) {
+  DateTime now = rtc.now();
+  sensors_event_t humidity, temperature;
+  aht.getEvent(&humidity, &temperature);
+
+  /* Be sure to update this value based on the IC and the gain settings! */
+  float multiplier = 0.1875F; /* ADS1115  @ +/- 6.144V gain (16-bit results) */
+
+  // Read the values from each of the four channels
+  int16_t adc0 = ads.readADC_SingleEnded(0); //  * multiplier
+  int16_t adc1 = ads.readADC_SingleEnded(1); //  * multiplier
+  int16_t adc2 = ads.readADC_SingleEnded(2); //  * multiplier
+  int16_t adc3 = ads.readADC_SingleEnded(3); //  * multiplier
+
+  TRACE("%04d-%02d-%02dT%02d:%02d:%02d -> humidity: %.2f temperature: %.2f soil_moisture_0: %d soil_moisture_1: %d soil_moisture_2: %d soil_moisture_3: %d\n", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), humidity.relative_humidity, temperature.temperature, adc0, adc1, adc2, adc3);
+}
