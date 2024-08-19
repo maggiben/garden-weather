@@ -192,7 +192,7 @@ void handleUnknown() {
 }
 
 
-void handleGetSensor(const String& command) {
+void handleGetSensorOld(const String& command) {
   DateTime now = rtc.now();
   sensors_event_t humidity, temperature;
   aht.getEvent(&humidity, &temperature);
@@ -204,17 +204,32 @@ void handleGetSensor(const String& command) {
   const int16_t min_value = 1500; // ADC value when submerged in water
   const int16_t max_value = 2800; // ADC value when completely dry
 
-  // Read the values from each of the four channels
-  int16_t adc0 = ads.readADC_SingleEnded(0) * multiplier;
-  int16_t adc1 = ads.readADC_SingleEnded(1) * multiplier;
-  int16_t adc2 = ads.readADC_SingleEnded(2) * multiplier;
-  int16_t adc3 = ads.readADC_SingleEnded(3) * multiplier;
+  // Variables to accumulate the readings
+  int32_t sum_adc0 = 0;
+  int32_t sum_adc1 = 0;
+  int32_t sum_adc2 = 0;
+  int32_t sum_adc3 = 0;
+
+  // Take 10 readings in 1 second
+  for (int i = 0; i < 10; i++) {
+      sum_adc0 += ads.readADC_SingleEnded(0) * multiplier;
+      sum_adc1 += ads.readADC_SingleEnded(1) * multiplier;
+      sum_adc2 += ads.readADC_SingleEnded(2) * multiplier;
+      sum_adc3 += ads.readADC_SingleEnded(3) * multiplier;
+      vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
+
+  // Calculate the average ADC value
+  int16_t avg_adc0 = sum_adc0 / 10;
+  int16_t avg_adc1 = sum_adc1 / 10;
+  int16_t avg_adc2 = sum_adc2 / 10;
+  int16_t avg_adc3 = sum_adc3 / 10;
 
   // Map ADC values to percentage
-  float percentage0 = (1.0 - ((float)(adc0 - min_value) / (max_value - min_value))) * 100.0;
-  float percentage1 = (1.0 - ((float)(adc1 - min_value) / (max_value - min_value))) * 100.0;
-  float percentage2 = (1.0 - ((float)(adc2 - min_value) / (max_value - min_value))) * 100.0;
-  float percentage3 = (1.0 - ((float)(adc3 - min_value) / (max_value - min_value))) * 100.0;
+  float percentage0 = (1.0 - ((float)(avg_adc0 - min_value) / (max_value - min_value))) * 100.0;
+  float percentage1 = (1.0 - ((float)(avg_adc1 - min_value) / (max_value - min_value))) * 100.0;
+  float percentage2 = (1.0 - ((float)(avg_adc2 - min_value) / (max_value - min_value))) * 100.0;
+  float percentage3 = (1.0 - ((float)(avg_adc3 - min_value) / (max_value - min_value))) * 100.0;
 
   // Ensure percentage is within 0 to 100%
   percentage0 = constrain(percentage0, 0.0, 100.0);
@@ -222,9 +237,81 @@ void handleGetSensor(const String& command) {
   percentage2 = constrain(percentage2, 0.0, 100.0);
   percentage3 = constrain(percentage3, 0.0, 100.0);
 
-  // %Y-%m-%dT%H:%M:%S
+  // Print the average values
   TRACE("%04d-%02d-%02dT%02d:%02d:%02d -> humidity: %.2f temperature: %.2f soil_moisture_0: %.2f%% soil_moisture_1: %.2f%% soil_moisture_2: %.2f%% soil_moisture_3: %.2f%%\n", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), humidity.relative_humidity, temperature.temperature, percentage0, percentage1, percentage2, percentage3);
 }
+
+void handleGetSensor(const String& command) {
+  DateTime now = rtc.now();
+  sensors_event_t humidity, temperature;
+  aht.getEvent(&humidity, &temperature);
+
+  float multiplier = 0.1875F; // ADS1115 @ +/- 6.144V gain (16-bit results)
+
+  // Constants for mapping ADC values to percentage
+  const int16_t min_value = 1500; // ADC value when submerged in water
+  const int16_t max_value = 2800; // ADC value when completely dry
+
+  // Variables to accumulate the readings
+  int32_t sum_adc[4] = {0, 0, 0, 0};
+
+  // Take 10 readings in 500ms
+  for (int i = 0; i < 10; i++) {
+    for (int j = 0; j < 4; j++) {
+      sum_adc[j] += ads.readADC_SingleEnded(j) * multiplier;
+    }
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+  }
+
+  // Calculate the average ADC values
+  int16_t avg_adc[4];
+  for (int j = 0; j < 4; j++) {
+    avg_adc[j] = sum_adc[j] / 10;
+  }
+
+  // Check for any deviations greater than 25% of the mean
+  bool deviation_detected = false;
+  for (int j = 0; j < 4; j++) {
+    float mean = avg_adc[j];
+    for (int i = 0; i < 10; i++) {
+      int16_t reading = ads.readADC_SingleEnded(j) * multiplier;
+      if (abs(reading - mean) > (0.25 * mean)) {
+        deviation_detected = true;
+        break;
+      }
+    }
+    if (deviation_detected) break;
+  }
+
+  // If a deviation is detected, take another 10 readings in 500ms
+  if (deviation_detected) {
+    sum_adc[0] = sum_adc[1] = sum_adc[2] = sum_adc[3] = 0;
+    for (int i = 0; i < 10; i++) {
+      for (int j = 0; j < 4; j++) {
+        sum_adc[j] += ads.readADC_SingleEnded(j) * multiplier;
+      }
+      vTaskDelay(50 / portTICK_PERIOD_MS);
+    }
+    // Recalculate the average ADC values
+    for (int j = 0; j < 4; j++) {
+      avg_adc[j] = sum_adc[j] / 10;
+    }
+  }
+
+  // Map ADC values to percentage
+  float percentage[4];
+  for (int j = 0; j < 4; j++) {
+    percentage[j] = (1.0 - ((float)(avg_adc[j] - min_value) / (max_value - min_value))) * 100.0;
+    percentage[j] = constrain(percentage[j], 0.0, 100.0);
+  }
+
+  // Print the average values
+  TRACE("%04d-%02d-%02dT%02d:%02d:%02d -> humidity: %.2f temperature: %.2f soil_moisture_0: %.2f%% soil_moisture_1: %.2f%% soil_moisture_2: %.2f%% soil_moisture_3: %.2f%%\n", 
+    now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), 
+    humidity.relative_humidity, temperature.temperature, 
+    percentage[0], percentage[1], percentage[2], percentage[3]);
+}
+
 
 void handleRawSensor(const String& command) {
   DateTime now = rtc.now();
@@ -240,5 +327,6 @@ void handleRawSensor(const String& command) {
   int16_t adc2 = ads.readADC_SingleEnded(2); //  * multiplier
   int16_t adc3 = ads.readADC_SingleEnded(3); //  * multiplier
 
+  // Print the average values %Y-%m-%dT%H:%M:%S
   TRACE("%04d-%02d-%02dT%02d:%02d:%02d -> humidity: %.2f temperature: %.2f soil_moisture_0: %d soil_moisture_1: %d soil_moisture_2: %d soil_moisture_3: %d\n", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), humidity.relative_humidity, temperature.temperature, adc0, adc1, adc2, adc3);
 }
