@@ -192,7 +192,7 @@ void handleUnknown() {
 }
 
 
-void handleGetSensorOld(const String& command) {
+void handleGetSensorOld2(const String& command) {
   DateTime now = rtc.now();
   sensors_event_t humidity, temperature;
   aht.getEvent(&humidity, &temperature);
@@ -241,7 +241,7 @@ void handleGetSensorOld(const String& command) {
   TRACE("%04d-%02d-%02dT%02d:%02d:%02d -> humidity: %.2f temperature: %.2f soil_moisture_0: %.2f%% soil_moisture_1: %.2f%% soil_moisture_2: %.2f%% soil_moisture_3: %.2f%%\n", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), humidity.relative_humidity, temperature.temperature, percentage0, percentage1, percentage2, percentage3);
 }
 
-void handleGetSensor(const String& command) {
+void handleGetSensorOld(const String& command) {
   DateTime now = rtc.now();
   sensors_event_t humidity, temperature;
   aht.getEvent(&humidity, &temperature);
@@ -310,6 +310,81 @@ void handleGetSensor(const String& command) {
     now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), 
     humidity.relative_humidity, temperature.temperature, 
     percentage[0], percentage[1], percentage[2], percentage[3]);
+}
+
+void handleGetSensor(const String& command) {
+  DateTime now = rtc.now();
+  sensors_event_t humidity, temperature;
+  aht.getEvent(&humidity, &temperature);
+
+  float multiplier = 0.1875F; // ADS1115 @ +/- 6.144V gain (16-bit results)
+
+  // Constants for mapping ADC values to percentage
+  const int16_t min_value = 1500; // ADC value when submerged in water
+  const int16_t max_value = 2800; // ADC value when completely dry
+
+  // Arrays to hold the 10 readings for each channel
+  int16_t readings_adc0[10];
+  int16_t readings_adc1[10];
+  int16_t readings_adc2[10];
+  int16_t readings_adc3[10];
+
+  // Take 10 readings in 1 second
+  for (int i = 0; i < 10; i++) {
+    readings_adc0[i] = ads.readADC_SingleEnded(0) * multiplier;
+    readings_adc1[i] = ads.readADC_SingleEnded(1) * multiplier;
+    readings_adc2[i] = ads.readADC_SingleEnded(2) * multiplier;
+    readings_adc3[i] = ads.readADC_SingleEnded(3) * multiplier;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
+
+  // Helper function to filter out extreme values and compute the mean
+  auto filter_and_mean = [](int16_t* readings, int count) -> float {
+    // Compute the mean of all readings
+    int32_t sum = 0;
+    for (int i = 0; i < count; i++) {
+      sum += readings[i];
+    }
+    float mean = (float)sum / count;
+
+    // Sort the readings to filter out extreme values
+    std::sort(readings, readings + count);
+
+    // Discard the lowest and highest 25% of the values (the first and last two)
+    int lower_index = count / 4;
+    int upper_index = 3 * (count / 4);
+
+    // Recalculate the mean using the middle 50% of values
+    sum = 0;
+    for (int i = lower_index; i <= upper_index; i++) {
+      sum += readings[i];
+    }
+    return (float)sum / (upper_index - lower_index + 1);
+  };
+
+  // Compute the final averages after filtering extremes
+  float avg_adc0 = filter_and_mean(readings_adc0, 10);
+  float avg_adc1 = filter_and_mean(readings_adc1, 10);
+  float avg_adc2 = filter_and_mean(readings_adc2, 10);
+  float avg_adc3 = filter_and_mean(readings_adc3, 10);
+
+  // Map ADC values to percentage
+  float percentage0 = (1.0 - ((avg_adc0 - min_value) / (max_value - min_value))) * 100.0;
+  float percentage1 = (1.0 - ((avg_adc1 - min_value) / (max_value - min_value))) * 100.0;
+  float percentage2 = (1.0 - ((avg_adc2 - min_value) / (max_value - min_value))) * 100.0;
+  float percentage3 = (1.0 - ((avg_adc3 - min_value) / (max_value - min_value))) * 100.0;
+
+  // Constrain values between 0 and 100%
+  percentage0 = constrain(percentage0, 0.0, 100.0);
+  percentage1 = constrain(percentage1, 0.0, 100.0);
+  percentage2 = constrain(percentage2, 0.0, 100.0);
+  percentage3 = constrain(percentage3, 0.0, 100.0);
+
+  // Print the final results
+  TRACE("%04d-%02d-%02dT%02d:%02d:%02d -> humidity: %.2f temperature: %.2f soil_moisture_0: %.2f%% soil_moisture_1: %.2f%% soil_moisture_2: %.2f%% soil_moisture_3: %.2f%%\n", 
+        now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), 
+        humidity.relative_humidity, temperature.temperature, 
+        percentage0, percentage1, percentage2, percentage3);
 }
 
 
