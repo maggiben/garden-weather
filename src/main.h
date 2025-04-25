@@ -43,6 +43,7 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_AHTX0.h>         // humidity sensor
 #include <Adafruit_ADS1X15.h>       // ADC
+#include <MHZ19.h>                  // Co2 Sensor
 #include "soc/soc.h"                // For WRITE_PERI_REG
 #include "soc/rtc_cntl_reg.h"       // For RTC_CNTL_BROWN_OUT_REG
 #include "constants.h"
@@ -73,6 +74,14 @@ TaskHandle_t serialTaskHandle;
 #ifndef ENABLE_SERIAL_COMMANDS
   #define ENABLE_SERIAL_COMMANDS
 #endif
+
+// Co2 Sensor
+#define RX_PIN 16             // Connect MH-Z19 TX to GPIO16 (U2RXD)
+#define TX_PIN 17             // Connect MH-Z19 RX to GPIO17 (U2TXD)
+#define BAUDRATE 9600         // MH-Z19 default baud rate
+
+MHZ19 myMHZ19;                // Create instance of MH-Z19
+HardwareSerial mhz19Serial(2); // Use UART2 (Serial2 on ESP32)
 
 SemaphoreHandle_t i2cMutex;
 
