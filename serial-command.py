@@ -8,7 +8,7 @@ def find_serial_port():
     ports = glob.glob('/dev/ttyUSB*')
     for port in ports:
         try:
-            ser = serial.Serial(port, 115200, timeout=1)
+            ser = serial.Serial(port, 115200, timeout=15)
             ser.close()  # Close the port if it opens successfully
             return port
         except serial.SerialException:
@@ -39,12 +39,15 @@ def send_ping_and_get_response():
 
             try:
                 # Open the serial port
-                ser = serial.Serial(serial_port, 115200, timeout=1)
+                ser = serial.Serial(serial_port, 115200, timeout=15)
                 # ser.setDTR(False)
                 # ser.setRTS(False)
                 time.sleep(2)  # Wait for the serial connection to initialize
 
                 ser.write(f"{command}\n".encode())
+                ser.flush()
+
+                time.sleep(5)
 
                 # Wait for a response
                 response = ser.readline().decode(errors='ignore').strip()
@@ -52,9 +55,13 @@ def send_ping_and_get_response():
                 # Close the serial port
                 ser.close()
 
-                if response: 
-                    print(response)
-                    return 0  # Exit with status 0 indicating success
+                if response:
+                    if 'error' in response.lower():
+                        print(f"Attempt {attempt + 1}: MCU returned error, retrying...", file=sys.stderr)
+                        continue  # Try again
+                    else:
+                        print(response)
+                        return 0  # Exit with status 0 indicating success
                 else:
                     print(f"Attempt {attempt + 1} failed, on serial port {serial_port} retrying...", file=sys.stderr)
 

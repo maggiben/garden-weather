@@ -1,10 +1,16 @@
 #include "main.h"
+#include <Wire.h>
+#undef log_e
+#define log_e(...)
 
 
 /**
  * Hardware setup
  */
 void setup() {
+  esp_log_level_set("*", ESP_LOG_NONE);
+  esp_log_level_set("Wire", ESP_LOG_NONE);
+
   // put your setup code here, to run once:
   Serial.begin(115200);
 
@@ -219,11 +225,14 @@ void handleGetSensor(const String& command) {
   int16_t readings_adc2[10];
   int16_t readings_adc3[10];
 
-  // Take 10 readings in 1 second
+  // Take 10 readings
   for (int i = 0; i < 10; i++) {
     readings_adc0[i] = ads.readADC_SingleEnded(0) * multiplier;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
     readings_adc1[i] = ads.readADC_SingleEnded(1) * multiplier;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
     readings_adc2[i] = ads.readADC_SingleEnded(2) * multiplier;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
     readings_adc3[i] = ads.readADC_SingleEnded(3) * multiplier;
     vTaskDelay(100 / portTICK_PERIOD_MS);
   }
