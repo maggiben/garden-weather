@@ -109,12 +109,10 @@ struct CommandHandler {
 void serialPortHandler(void *pvParameters);
 void handleUnknown();
 void handleGetSensor(const String& command);
-void handleRawSensor(const String& command);
 
 // Array of command handlers
 CommandHandler commandHandlers[] = {
     {"get-sensor", handleGetSensor},
-    {"raw-sensor", handleRawSensor},
     // Add other commands and handlers here
 };
 
