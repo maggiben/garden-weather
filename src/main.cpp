@@ -288,3 +288,31 @@ void handleGetSensor(const String& command) {
         humidity.relative_humidity, temperature.temperature, CO2,
         percentage0, percentage1, percentage2, percentage3);
 }
+
+void setRTCFromISODate(const String &command) {
+  // Expected format: YYYY-MM-DDTHH:MM:SS use date +"%Y-%m-%dT%H:%M:%S"
+  String isoDate = command;
+  if (isoDate.length() != 19 || isoDate.charAt(10) != 'T') {
+    TRACE("error: bad format\n");
+    return;
+  }
+
+  int year = isoDate.substring(0, 4).toInt();
+  int month = isoDate.substring(5, 7).toInt();
+  int day = isoDate.substring(8, 10).toInt();
+  int hour = isoDate.substring(11, 13).toInt();
+  int minute = isoDate.substring(14, 16).toInt();
+  int second = isoDate.substring(17, 19).toInt();
+
+  if (year < 2000 || month < 1 || month > 12 || day < 1 || day > 31 ||
+      hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
+      TRACE("error: bad date\n");
+      return;
+  }
+
+  rtc.adjust(DateTime(year, month, day, hour, minute, second));
+  vTaskDelay(250 / portTICK_PERIOD_MS);
+  DateTime now = rtc.now();
+  TRACE("%04d-%02d-%02dT%02d:%02d:%02d", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+  return;
+}

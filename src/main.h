@@ -108,12 +108,14 @@ struct CommandHandler {
  */
 void serialPortHandler(void *pvParameters);
 void handleUnknown();
-void handleGetSensor(const String& command);
+void handleGetSensor(const String &command);
+void setRTCFromISODate(const String &command);
 
 // Array of command handlers
 CommandHandler commandHandlers[] = {
     {"get-sensor", handleGetSensor},
+    {"set-rtc", setRTCFromISODate},
     // Add other commands and handlers here
 };
 
-void handleSerialCommand(const String& command);
+void handleSerialCommand(const String &command);
