@@ -1,15 +1,9 @@
 #include "main.h"
-#include <Wire.h>
-#undef log_e
-#define log_e(...)
-
 
 /**
  * Hardware setup
  */
 void setup() {
-  esp_log_level_set("*", ESP_LOG_NONE);
-  esp_log_level_set("Wire", ESP_LOG_NONE);
 
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -72,7 +66,6 @@ void setup() {
   mhz19Serial.begin(BAUDRATE);
 
   myMHZ19.begin(mhz19Serial); // Start MH-Z19 communication on UART2
-  myMHZ19.calibrateZero();  // Perform zero calibration
   myMHZ19.autoCalibration(true); // Optional: enable auto-calibration
 
 
@@ -182,6 +175,9 @@ void loop() {
   vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
 
+
+
+
 void handleSerialCommand(const String& command) {
   // Number of commands in the array
   const int numCommands = sizeof(commandHandlers) / sizeof(commandHandlers[0]);
@@ -287,6 +283,13 @@ void handleGetSensor(const String& command) {
         now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(),
         humidity.relative_humidity, temperature.temperature, CO2,
         percentage0, percentage1, percentage2, percentage3);
+}
+
+void calibrateCo2Sensor(const String &command) {
+  myMHZ19.calibrateZero();
+  vTaskDelay(2000 / portTICK_PERIOD_MS);
+  int CO2 = myMHZ19.getCO2(); // Request CO2 (as ppm)
+  TRACE("CO2: %d ppm\n", CO2);
 }
 
 void setRTCFromISODate(const String &command) {

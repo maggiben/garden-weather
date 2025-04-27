@@ -110,11 +110,13 @@ void serialPortHandler(void *pvParameters);
 void handleUnknown();
 void handleGetSensor(const String &command);
 void setRTCFromISODate(const String &command);
+void calibrateCo2Sensor(const String &command);
 
 // Array of command handlers
 CommandHandler commandHandlers[] = {
     {"get-sensor", handleGetSensor},
     {"set-rtc", setRTCFromISODate},
+    {"calibrate-co2-sensor", calibrateCo2Sensor},
     // Add other commands and handlers here
 };
 
